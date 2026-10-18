@@ -30,7 +30,7 @@ extern void setup_selinux(const char *domain, struct cred *cred);
 extern struct cred *ksu_cred;
 
 #ifdef CONFIG_KSU_SUSFS_ENABLE_LOG
-DEFINE_STATIC_KEY_TRUE(susfs_is_log_enabled);
+DEFINE_STATIC_KEY_FALSE(susfs_is_log_enabled);
 #define SUSFS_LOGI(fmt, ...) if (static_branch_likely(&susfs_is_log_enabled)) pr_info("susfs:[%u][%d][%s] " fmt, current_uid().val, current->pid, __func__, ##__VA_ARGS__)
 #define SUSFS_LOGE(fmt, ...) if (static_branch_likely(&susfs_is_log_enabled)) pr_err("susfs:[%u][%d][%s]" fmt, current_uid().val, current->pid, __func__, ##__VA_ARGS__)
 #else
@@ -241,7 +241,7 @@ int susfs_get_data_path(struct path *path) {
 #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 // - Default to false now so zygisk can pick up the sus mounts without the need to turn it off manually in post-fs-data stage
 //   otherwise user needs to turn it on in post-fs-data stage and turn it off in boot-completed stage
-bool susfs_hide_sus_mnts_for_non_su_procs = false;
+bool susfs_hide_sus_mnts_for_non_su_procs = true;
 
 void susfs_set_hide_sus_mnts_for_non_su_procs(void __user **user_info) {
 	struct st_susfs_hide_sus_mnts_for_non_su_procs info = {0};
@@ -653,13 +653,13 @@ out_copy_to_user:
 }
 
 void susfs_spoof_uname(struct new_utsname* tmp) {
-	unsigned seq;
-
-	do {
-		seq = read_seqbegin(&susfs_uname_seqlock);
-		strncpy(tmp->release, my_uname.release, __NEW_UTS_LEN);
-		strncpy(tmp->version, my_uname.version, __NEW_UTS_LEN);
-	} while (read_seqretry(&susfs_uname_seqlock, seq));
+	/* Force native UTS string: ignore any userspace set_uname value.
+	 * The kernel image already embeds the official UTS_VERSION, so we
+	 * simply do not overwrite tmp here. This keeps uname(2),
+	 * /proc/version and the uts sysctl all reporting the official
+	 * string and removes the image-vs-runtime mismatch.	*/
+	(void)tmp;
+	return;
 }
 #endif // #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
 
