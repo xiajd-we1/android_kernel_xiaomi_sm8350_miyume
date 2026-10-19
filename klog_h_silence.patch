@@ -1,0 +1,41 @@
+diff --git a/kernel/include/klog.h b/kernel/include/klog.h
+index 025475e7..0e9c0c0a 100644
+--- a/kernel/include/klog.h
++++ b/kernel/include/klog.h
+@@ -13,9 +13,33 @@
+ 
+ #include <linux/printk.h>
+ 
+-#ifdef pr_fmt
++/*
++ * Silence every BakaSU/KernelSU log line so the "KernelSU" string never
++ * reaches dmesg / /dev/kmsg. Detectors read the kernel log buffer to
++ * fingerprint the root implementation; keeping the arguments referenced
++ * (via no_printk) avoids unused-variable warnings while emitting
++ * nothing at runtime.
++ */
+ #undef pr_fmt
+-#define pr_fmt(fmt) "KernelSU: " fmt
+-#endif
++#define pr_fmt(fmt) fmt
++
++#undef pr_emerg
++#undef pr_alert
++#undef pr_crit
++#undef pr_err
++#undef pr_warn
++#undef pr_notice
++#undef pr_info
++#undef pr_debug
++#undef pr_cont
++#define pr_emerg(fmt, ...) no_printk(fmt, ##__VA_ARGS__)
++#define pr_alert(fmt, ...) no_printk(fmt, ##__VA_ARGS__)
++#define pr_crit(fmt, ...) no_printk(fmt, ##__VA_ARGS__)
++#define pr_err(fmt, ...) no_printk(fmt, ##__VA_ARGS__)
++#define pr_warn(fmt, ...) no_printk(fmt, ##__VA_ARGS__)
++#define pr_notice(fmt, ...) no_printk(fmt, ##__VA_ARGS__)
++#define pr_info(fmt, ...) no_printk(fmt, ##__VA_ARGS__)
++#define pr_debug(fmt, ...) no_printk(fmt, ##__VA_ARGS__)
++#define pr_cont(fmt, ...) no_printk(fmt, ##__VA_ARGS__)
+ 
+ #endif
