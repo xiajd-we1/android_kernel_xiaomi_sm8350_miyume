@@ -71,6 +71,19 @@ static int statfs_by_dentry(struct dentry *dentry, struct kstatfs *buf)
 	return retval;
 }
 
+/* ---- SUSFS v2.3.0 compat: exported wrappers ---- */
+int calculate_f_flags_wrapper(struct vfsmount *mnt)
+{
+	return calculate_f_flags(mnt);
+}
+EXPORT_SYMBOL(calculate_f_flags_wrapper);
+
+int statfs_by_dentry_wrapper(struct dentry *dentry, struct kstatfs *buf)
+{
+	return statfs_by_dentry(dentry, buf);
+}
+EXPORT_SYMBOL(statfs_by_dentry_wrapper);
+
 int vfs_get_fsid(struct dentry *dentry, __kernel_fsid_t *fsid)
 {
 	struct kstatfs st;
