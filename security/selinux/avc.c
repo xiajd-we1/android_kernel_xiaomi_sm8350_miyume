@@ -41,6 +41,12 @@
 #define avc_cache_stats_incr(field)	do {} while (0)
 #endif
 
+#ifdef CONFIG_KSU_SUSFS
+extern u32 susfs_ksu_sid;
+extern u32 susfs_priv_app_sid;
+extern struct static_key_false susfs_is_avc_log_spoofing_enabled;
+#endif
+
 struct avc_entry {
 	u32			ssid;
 	u32			tsid;
@@ -693,11 +699,6 @@ static void avc_audit_pre_callback(struct audit_buffer *ab, void *a)
 
 	audit_log_format(ab, " } for ");
 }
-#ifdef CONFIG_KSU_SUSFS
-extern u32 susfs_ksu_sid;
-extern u32 susfs_priv_app_sid;
-extern struct static_key_false susfs_is_avc_log_spoofing_enabled;
-#endif
 
 /**
  * avc_audit_post_callback - SELinux specific information
@@ -732,6 +733,7 @@ static void avc_audit_post_callback(struct audit_buffer *ab, void *a)
 				audit_log_format(ab, " tsid=%d", susfs_priv_app_sid);
 			else
 				audit_log_format(ab, " tcontext=%s", "u:r:priv_app:s0:c512,c768");
+			kfree(scontext);
 			goto bypass_orig_flow;
 		}
 	}
@@ -743,10 +745,10 @@ static void avc_audit_post_callback(struct audit_buffer *ab, void *a)
 		audit_log_format(ab, " tcontext=%s", scontext);
 		kfree(scontext);
 	}
-
 #ifdef CONFIG_KSU_SUSFS
 bypass_orig_flow:
 #endif
+
 	audit_log_format(ab, " tclass=%s", secclass_map[sad->tclass-1].name);
 
 	if (sad->denied)

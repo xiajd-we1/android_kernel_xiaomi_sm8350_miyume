@@ -8,10 +8,6 @@
 #include <linux/jump_label.h>
 #include <linux/rwsem.h>
 
-#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
-extern struct static_key_false susfs_is_uname_spoof_buffer_set;
-extern void susfs_spoof_uname(struct new_utsname *tmp);
-#endif
 
 static int version_proc_show(struct seq_file *m, void *v)
 {
@@ -24,10 +20,6 @@ static int version_proc_show(struct seq_file *m, void *v)
 	 */
 	down_read(&uts_sem);
 	memcpy(&ut, utsname(), sizeof(ut));
-#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
-	if (static_branch_likely(&susfs_is_uname_spoof_buffer_set))
-		susfs_spoof_uname(&ut);
-#endif
 	up_read(&uts_sem);
 
 	seq_printf(m, linux_proc_banner, ut.sysname, ut.release, ut.version);

@@ -41,6 +41,10 @@
 #include "objsec.h"
 #include "conditional.h"
 
+#ifdef CONFIG_KSU_SUSFS
+extern bool ksu_selinux_hide_enabled __read_mostly;
+#endif // #ifdef CONFIG_KSU_SUSFS
+
 enum sel_inos {
 	SEL_ROOT_INO = 2,
 	SEL_LOAD,	/* load policy */
@@ -246,6 +250,8 @@ static int sel_open_handle_status(struct inode *inode, struct file *filp)
 
 	filp->private_data = status;
 
+#ifdef CONFIG_KSU_SUSFS
+#endif // #ifdef CONFIG_KSU_SUSFS
 	return 0;
 }
 
@@ -783,6 +789,8 @@ static const struct file_operations sel_transition_ops = {
  * Remaining nodes use transaction based IO methods like nfsd/nfsctl.c
  */
 static ssize_t sel_write_access(struct file *file, char *buf, size_t size);
+#ifdef CONFIG_KSU_SUSFS
+#endif // #ifdef CONFIG_KSU_SUSFS
 static ssize_t sel_write_create(struct file *file, char *buf, size_t size);
 static ssize_t sel_write_relabel(struct file *file, char *buf, size_t size);
 static ssize_t sel_write_user(struct file *file, char *buf, size_t size);
@@ -881,6 +889,7 @@ out:
 	kfree(scon);
 	return length;
 }
+
 
 static ssize_t sel_write_create(struct file *file, char *buf, size_t size)
 {

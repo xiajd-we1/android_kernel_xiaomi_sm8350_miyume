@@ -13,10 +13,6 @@
 #include <linux/utsname.h>
 #include <linux/jump_label.h>
 
-#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
-extern struct static_key_false susfs_is_uname_spoof_buffer_set;
-extern void susfs_spoof_uname(struct new_utsname *tmp);
-#endif
 #include <linux/rwsem.h>
 
 #ifdef CONFIG_PROC_SYSCTL
@@ -55,23 +51,6 @@ static int proc_do_uts_string(struct ctl_table *table, int write,
 	down_read(&uts_sem);
 	memcpy(tmp_data, get_uts(table), sizeof(tmp_data));
 	up_read(&uts_sem);
-#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
-	/*
-	 * Mirror the SUSFS uname spoof on /proc/sys/kernel/{osrelease,version}
-	 * so every readable source agrees with uname(2) and /proc/version.
-	 * Only reads are redirected; writes still hit the real UTS fields.
-	 */
-	if (!write && static_branch_likely(&susfs_is_uname_spoof_buffer_set)) {
-		struct new_utsname u;
-
-		memset(&u, 0, sizeof(u));
-		susfs_spoof_uname(&u);
-		if (table->data == (char *)init_uts_ns.name.release)
-			strscpy(tmp_data, u.release, sizeof(tmp_data));
-		else if (table->data == (char *)init_uts_ns.name.version)
-			strscpy(tmp_data, u.version, sizeof(tmp_data));
-	}
-#endif
 	r = proc_dostring(&uts_table, write, buffer, lenp, ppos);
 
 	if (write) {
