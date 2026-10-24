@@ -1,0 +1,41 @@
+KernelSU submodule state for 9func
+==================================
+
+The BakaSU tree used here is a 94 MB fork. Pushing a branch from this
+machine timed out repeatedly, so the five kernel-side compatibility
+changes are shipped as a patch instead of a submodule commit.
+
+Base (available upstream):
+  repo:   https://github.com/Baka-SU/BakaSU
+  commit: 5b76b884c75f729a220bb317aa4a4fc78f0e0e9c
+  (BakaSU v4.2.0-rc3, KSU 35222)
+
+Apply after initialising the submodule:
+
+  git submodule update --init KernelSU
+  cd KernelSU
+  git checkout 5b76b884c75f729a220bb317aa4a4fc78f0e0e9c
+  git apply ../patches/kernelsu-susfs-5.4-compat.patch
+
+Files touched by the patch:
+
+  kernel/feature/kernel_umount.c   8 lines
+  kernel/hook/setuid_hook.c        6 lines
+  kernel/include/klog.h           30 lines
+  kernel/selinux/selinux.c        21 lines
+  kernel/selinux/selinux.h         1 line
+
+What each change does:
+
+  selinux.c/h   export susfs_is_current_ksu_domain() and the
+                susfs_priv_app_sid / susfs_ksu_sid caches that
+                fs/susfs.c reads at build time.
+  klog.h        route SUSFS_LOGI / SUSFS_LOGE / SUSFS_LOGW through
+                the ksu logging helpers so susfs diagnostics obey
+                CONFIG_KSU_SUSFS_ENABLE_LOG.
+  kernel_umount.c  honour TIF_PROC_UMOUNTED when deciding whether a
+                path is hidden, matching the 5.10 reference port.
+  setuid_hook.c set TIF_PROC_UMOUNTED on zygote-forked app processes.
+                This is the flag every SUSFS umounted-app check keys
+                on; without it sus_path, sus_map and open_redirect
+                all silently do nothing for real apps.
