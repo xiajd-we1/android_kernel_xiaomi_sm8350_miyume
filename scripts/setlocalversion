@@ -53,6 +53,21 @@ scm_version()
 	short=false
 
 	cd "$srctree"
+
+	# KSU_SCM_OVERRIDE: report the vendor commit hash instead of ours.
+	# CONFIG_LOCALVERSION_AUTO stays =y (matching the stock .config), but
+	# `git describe`/HEAD would otherwise print our own -g91309f6a, which
+	# immediately identifies this as a rebuilt kernel. The vendor image
+	# reports -g369674717ad3.
+	if [ -n "${KSU_SCM_OVERRIDE:-}" ]; then
+		if test "$1" = "--short"; then
+			echo "+"
+		else
+			printf '%s' "-g${KSU_SCM_OVERRIDE}"
+		fi
+		return
+	fi
+
 	if test -e .scmversion; then
 		cat .scmversion
 		return

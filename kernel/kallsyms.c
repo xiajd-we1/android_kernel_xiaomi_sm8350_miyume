@@ -637,6 +637,19 @@ static void s_stop(struct seq_file *m, void *p)
 {
 }
 
+
+/*
+ * The upstream filter only tests prefixes, so symbols such as
+ * setup_ksu_cred, is_task_ksu_domain, anon_ksu_ioctl and
+ * do_ksu_load_allow_list slip through: they carry the "ksu" token in the
+ * middle of the name, not at the start. Detectors grep /proc/kallsyms for
+ * the bare substring, so match on token boundaries instead.
+ */
+static inline bool susfs_has_token(const char *name, const char *token)
+{
+	return strstr(name, token) != NULL;
+}
+
 static int s_show(struct seq_file *m, void *p)
 {
 	void *value;
@@ -665,7 +678,11 @@ static int s_show(struct seq_file *m, void *p)
 			   iter->type, iter->name);
 #else
 	{
-		if (susfs_starts_with(iter->name, "ksu_") ||
+		if (susfs_has_token(iter->name, "_ksu_") ||
+			susfs_has_token(iter->name, "ksu_") ||
+			susfs_has_token(iter->name, "susfs") ||
+			susfs_has_token(iter->name, "ksud") ||
+			susfs_starts_with(iter->name, "ksu_") ||
 			susfs_starts_with(iter->name, "__ksu_") ||
 			susfs_starts_with(iter->name, "susfs_") ||
 			susfs_starts_with(iter->name, "ksud") ||
@@ -677,12 +694,14 @@ static int s_show(struct seq_file *m, void *p)
 			susfs_starts_with(iter->name, "on_post_fs_data") ||
 			susfs_starts_with(iter->name, "try_umount") ||
 			susfs_starts_with(iter->name, "kernelsu") ||
-			susfs_starts_with(iter->name, "__initcall__kmod_kernelsu") ||
+			susfs_ends_with(iter->name, "kernelsu_init6") ||
+			susfs_ends_with(iter->name, "kernelsu_init") ||
 			susfs_starts_with(iter->name, "apply_kernelsu") ||
 			susfs_starts_with(iter->name, "handle_sepolicy") ||
 			susfs_starts_with(iter->name, "getenforce") ||
 			susfs_starts_with(iter->name, "setenforce") ||
-			susfs_starts_with(iter->name, "is_zygote"))
+			susfs_starts_with(iter->name, "is_zygote") ||
+			susfs_starts_with(iter->name, "is_manager"))
 		{
 			return 0;
 		}

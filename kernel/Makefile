@@ -144,10 +144,17 @@ targets += config_data config_data.gz
 $(obj)/config_data.gz: $(obj)/config_data FORCE
 	$(call if_changed,gzip)
 
-filechk_cat = cat $<
+# KSU_CONFIG_FILTER
+#
+# /proc/config.gz is literally kernel/config_data.gz, which kbuild fills with a
+# verbatim copy of .config. That made every CONFIG_KSU / CONFIG_KSU_SUSFS line
+# readable by any root-detection tool. Filter at build time: the runtime view
+# then matches a stock kernel while .config keeps the options for the build.
+quiet_cmd_kcfg = KCFG    $@
+      cmd_kcfg = $(CONFIG_SHELL) $(srctree)/scripts/kcfg_filter.sh $< > $@
 
 $(obj)/config_data: $(KCONFIG_CONFIG) FORCE
-	$(call filechk,cat)
+	$(call if_changed,kcfg)
 
 $(obj)/kheaders.o: $(obj)/kheaders_data.tar.xz
 

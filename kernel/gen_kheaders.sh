@@ -82,6 +82,19 @@ done | cpio --quiet -pd $cpio_dir >/dev/null 2>&1
 find $cpio_dir -type f -print0 |
 	xargs -0 -P8 -n1 perl -pi -e 'BEGIN {undef $/;}; s/\/\*((?!SPDX).)*?\*\///smg;'
 
+# KSU_HEADER_FILTER
+#
+# /sys/kernel/kheaders.tar.xz must not reveal our integration: without this,
+# it ships include/config/ksu/... , include/linux/susfs.h and KernelSU/kernel
+# headers, which is a trivially greppable fingerprint. Drop them from the
+# staging dir before packaging.
+rm -rf "$cpio_dir/include/config/ksu" 2>/dev/null || true
+rm -f  "$cpio_dir/include/config/ksu.h" 2>/dev/null || true
+rm -f  "$cpio_dir/include/linux/susfs.h" "$cpio_dir/include/linux/susfs_def.h" 2>/dev/null || true
+find "$cpio_dir" -type d -name kernelsu -prune -exec rm -rf {} + 2>/dev/null || true
+find "$cpio_dir" -type f \( -iname '*susfs*' -o -iname '*kernelsu*' -o -iname 'ksu*.h' \) \
+     -delete 2>/dev/null || true
+
 # Create archive and try to normalize metadata for reproducibility.
 # For compatibility with older versions of tar, files are fed to tar
 # pre-sorted, as --sort=name might not be available.

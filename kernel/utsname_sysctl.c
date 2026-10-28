@@ -15,6 +15,11 @@
 
 #include <linux/rwsem.h>
 
+#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
+extern struct static_key_false susfs_is_uname_spoof_buffer_set;
+extern void susfs_spoof_uname(struct new_utsname *tmp);
+#endif
+
 #ifdef CONFIG_PROC_SYSCTL
 
 static void *get_uts(struct ctl_table *table)
@@ -50,6 +55,33 @@ static int proc_do_uts_string(struct ctl_table *table, int write,
 	 */
 	down_read(&uts_sem);
 	memcpy(tmp_data, get_uts(table), sizeof(tmp_data));
+#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
+	/*
+	 * uname(2) goes through susfs_spoof_uname(), but /proc/sys/kernel/*
+	 * reads the raw uts_namespace field here. Without this the spoofed
+	 * and real kernel version strings coexist on the same device, which
+	 * is an instant cross-source contradiction for any detector that
+	 * compares uname(2) with /proc/sys/kernel/version.
+	 */
+	if (!write &&
+	    static_branch_likely(&susfs_is_uname_spoof_buffer_set) &&
+	    (table->data == init_uts_ns.name.version ||
+	     table->data == init_uts_ns.name.release ||
+	     table->data == init_uts_ns.name.sysname)) {
+		struct new_utsname spoofed;
+
+		memset(&spoofed, 0, sizeof(spoofed));
+		memcpy(&spoofed, utsname(), sizeof(spoofed));
+		susfs_spoof_uname(&spoofed);
+
+		if (table->data == init_uts_ns.name.version)
+			memcpy(tmp_data, spoofed.version, sizeof(tmp_data));
+		else if (table->data == init_uts_ns.name.release)
+			memcpy(tmp_data, spoofed.release, sizeof(tmp_data));
+		else
+			memcpy(tmp_data, spoofed.sysname, sizeof(tmp_data));
+	}
+#endif
 	up_read(&uts_sem);
 	r = proc_dostring(&uts_table, write, buffer, lenp, ppos);
 

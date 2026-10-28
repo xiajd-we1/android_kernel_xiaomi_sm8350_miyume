@@ -940,18 +940,6 @@ static int show_smap(struct seq_file *m, void *v)
 
 	smap_gather_stats(vma, &mss);
 
-	/* Hide shared/private dirty of system executable mappings to
-	 * suppress loader-visible hook artifacts (e.g. libhwui.so
-	 * shared-dirty executable pages flagged by detectors). */
-	if (vma->vm_file && (vma->vm_flags & VM_EXEC)) {
-		char sysmap_buf[256];
-		char *sysmap_path = d_path(&vma->vm_file->f_path,
-					    sysmap_buf, sizeof(sysmap_buf));
-		if (!IS_ERR(sysmap_path) && strstr(sysmap_path, "/system/")) {
-			mss.shared_dirty = 0;
-			mss.private_dirty = 0;
-		}
-	}
 
 	show_map_vma(m, vma);
 	if (vma_get_anon_name(vma)) {

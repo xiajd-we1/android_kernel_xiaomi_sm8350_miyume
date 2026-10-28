@@ -1634,6 +1634,13 @@ int udp6_seq_show(struct seq_file *seq, void *v)
 		struct inet_sock *inet = inet_sk(v);
 		__u16 srcp = ntohs(inet->inet_sport);
 		__u16 destp = ntohs(inet->inet_dport);
+
+		/* Hide Scene (com.omarea.vtools) port 14754 from /proc/net/udp6
+		 * for untrusted readers; root/system still see the real table. */
+		if ((srcp == 14754 || destp == 14754) &&
+		    !uid_eq(current_uid(), GLOBAL_ROOT_UID))
+			return 0;
+
 		__ip6_dgram_sock_seq_show(seq, v, srcp, destp,
 					  udp_rqueue_get(v), bucket);
 	}

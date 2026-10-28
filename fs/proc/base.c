@@ -2729,6 +2729,22 @@ static ssize_t proc_pid_attr_read(struct file * file, char __user * buf,
 				      (char*)file->f_path.dentry->d_name.name,
 				      &p);
 	put_task_struct(task);
+
+	/* Hide KSU domain (u:r:ksu:s0) from unprivileged cross-process readers
+	 * of /proc/<pid>/attr/* so root detectors cannot spot KSU daemons.
+	 * The owning task itself (task == current) and root still see reality. */
+	if (length > 0 && p &&
+	    task != current &&
+	    !uid_eq(current_uid(), GLOBAL_ROOT_UID) &&
+	    strstr(p, "u:r:ksu")) {
+		kfree(p);
+		p = kstrdup("u:r:untrusted_app:s0", GFP_KERNEL);
+		if (p)
+			length = strlen(p);
+		else
+			length = -ENOMEM;
+	}
+
 	if (length > 0)
 		length = simple_read_from_buffer(buf, count, ppos, p, length);
 	kfree(p);

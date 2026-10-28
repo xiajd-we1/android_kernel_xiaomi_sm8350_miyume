@@ -44,7 +44,12 @@
 #ifdef CONFIG_KSU_SUSFS
 extern u32 susfs_ksu_sid;
 extern u32 susfs_priv_app_sid;
-extern struct static_key_false susfs_is_avc_log_spoofing_enabled;
+/*
+ * Declared as static_key_true to match the definition in fs/susfs.c.
+ * The two wrappers have identical layout, but keeping them consistent
+ * avoids relying on that detail and keeps the default-on semantics clear.
+ */
+extern struct static_key_true susfs_is_avc_log_spoofing_enabled;
 #endif
 
 struct avc_entry {

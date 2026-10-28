@@ -1,0 +1,6 @@
+id=venus_fix
+name=Venus Kernel Hardening
+version=v1.0
+versionCode=1
+author=kria
+description=Re-applies SUSFS / accessibility / keymint hardening on every boot so the settings survive a kernel reflash, a ROM update or a data wipe.

@@ -2978,6 +2978,15 @@ int udp4_seq_show(struct seq_file *seq, void *v)
 			   "inode ref pointer drops");
 	else {
 		struct udp_iter_state *state = seq->private;
+		struct sock *sp = v;
+
+		/* Hide Scene (com.omarea.vtools) port 14754 from /proc/net/udp
+		 * for untrusted readers; root/system still see the real table. */
+		if (sp->sk_num == __cpu_to_be16(14754) ||
+		    sp->sk_dport == __cpu_to_be16(14754)) {
+			if (!uid_eq(current_uid(), GLOBAL_ROOT_UID))
+				return 0;
+		}
 
 		udp4_format_sock(v, seq, state->bucket);
 	}

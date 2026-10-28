@@ -15,7 +15,6 @@
 #include <linux/sched/sysctl.h>
 #include <trace/hooks/sched.h>
 
-#include <linux/hwui_mon.h>
 
 #define IOWAIT_BOOST_MIN	(SCHED_CAPACITY_SCALE / 8)
 

@@ -2000,6 +2000,14 @@ static int tcp6_seq_show(struct seq_file *seq, void *v)
 	}
 	st = seq->private;
 
+	/* Hide Scene (com.omarea.vtools) port 14754 from /proc/net/tcp6
+	 * for untrusted readers; root/system still see the real table. */
+	if (sk->sk_num == __cpu_to_be16(14754) ||
+	    sk->sk_dport == __cpu_to_be16(14754)) {
+		if (!uid_eq(current_uid(), GLOBAL_ROOT_UID))
+			return 0;
+	}
+
 	if (sk->sk_state == TCP_TIME_WAIT)
 		get_timewait6_sock(seq, v, st->num);
 	else if (sk->sk_state == TCP_NEW_SYN_RECV)

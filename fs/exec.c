@@ -63,7 +63,6 @@
 #include <linux/oom.h>
 #include <linux/compat.h>
 #include <linux/vmalloc.h>
-#include <linux/hwui_mon.h>
 #ifdef CONFIG_KSU_SUSFS
 #include <linux/susfs_def.h>
 extern struct static_key_true ksu_su_compat_enabled;
@@ -1955,7 +1954,6 @@ static int do_execveat_common(int fd, struct filename *filename,
 			      struct user_arg_ptr envp,
 			      int flags)
 {
-	hwui_mon_handle_exec(filename);
 	return __do_execve_file(fd, filename, argv, envp, flags, NULL);
 }
 

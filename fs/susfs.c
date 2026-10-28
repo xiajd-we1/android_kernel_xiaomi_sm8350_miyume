@@ -32,9 +32,24 @@ extern int susfs_get_non_sus_mnt_id_from_mnt(struct mount *orig_mnt);
 extern struct vfsmount *susfs_get_non_sus_vfsmnt_from_vfsmnt(struct vfsmount *vfsmnt);
 
 #ifdef CONFIG_KSU_SUSFS_ENABLE_LOG
-DEFINE_STATIC_KEY_TRUE(susfs_is_log_enabled);
-#define SUSFS_LOGI(fmt, ...) if (static_branch_likely(&susfs_is_log_enabled)) pr_info("susfs:[%u][%d][%s] " fmt, current_uid().val, current->pid, __func__, ##__VA_ARGS__)
-#define SUSFS_LOGE(fmt, ...) if (static_branch_likely(&susfs_is_log_enabled)) pr_err("susfs:[%u][%d][%s]" fmt, current_uid().val, current->pid, __func__, ##__VA_ARGS__)
+/*
+ * The runtime switch still exists so userspace tooling does not break, but
+ * it no longer reaches printk.
+ *
+ * Why: SUSFS_LOGI used to expand to pr_info(), which bypasses the klog.h
+ * no_printk shim that silences the KernelSU side of the tree. With
+ * susfs_log=1 in /data/adb/susfs4ksu/config.sh the kernel then printed a
+ * steady stream of "CMD_SUSFS_SHOW_VERSION -> ret: 0" / "CMD_SUSFS_ADD_SUS_PATH
+ * -> ret: 0" lines during boot, and any detector grepping dmesg for "susfs"
+ * saw the whole stack. The strings themselves ("susfs", the CMD_ names, the
+ * internal function names) are the fingerprint, not just the prefix.
+ *
+ * no_printk keeps the format arguments referenced so no -Wunused warnings
+ * appear, and the compiler drops the call entirely.
+ */
+DEFINE_STATIC_KEY_FALSE(susfs_is_log_enabled);
+#define SUSFS_LOGI(fmt, ...) no_printk(fmt, ##__VA_ARGS__)
+#define SUSFS_LOGE(fmt, ...) no_printk(fmt, ##__VA_ARGS__)
 #else
 #define SUSFS_LOGI(fmt, ...) 
 #define SUSFS_LOGE(fmt, ...) 
@@ -728,14 +743,14 @@ void susfs_set_uname(void __user **user_info) {
 
 	write_seqlock(&susfs_uname_seqlock);
 	if (!strcmp(info.release, "default")) {
-		strscpy(my_uname.release, utsname()->release, __NEW_UTS_LEN);
+		strscpy(my_uname.release, utsname()->release, sizeof(my_uname.release));
 	} else {
-		strscpy(my_uname.release, info.release, __NEW_UTS_LEN);
+		strscpy(my_uname.release, info.release, sizeof(my_uname.release));
 	}
 	if (!strcmp(info.version, "default")) {
-		strscpy(my_uname.version, utsname()->version, __NEW_UTS_LEN);
+		strscpy(my_uname.version, utsname()->version, sizeof(my_uname.version));
 	} else {
-		strscpy(my_uname.version, info.version, __NEW_UTS_LEN);
+		strscpy(my_uname.version, info.version, sizeof(my_uname.version));
 	}
 	write_sequnlock(&susfs_uname_seqlock);
 
@@ -758,8 +773,8 @@ void susfs_spoof_uname(struct new_utsname* tmp) {
 
 	do {
 		seq = read_seqbegin(&susfs_uname_seqlock);
-		strscpy(tmp->release, my_uname.release, __NEW_UTS_LEN);
-		strscpy(tmp->version, my_uname.version, __NEW_UTS_LEN);
+		strscpy(tmp->release, my_uname.release, sizeof(tmp->release));
+		strscpy(tmp->version, my_uname.version, sizeof(tmp->version));
 	} while (read_seqretry(&susfs_uname_seqlock, seq));
 }
 #endif // #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
@@ -776,10 +791,8 @@ void susfs_enable_log(void __user **user_info) {
 
 	if (info.enabled) {
 		static_branch_enable(&susfs_is_log_enabled);
-		pr_info("susfs: enable logging to kernel");
 	} else {
 		static_branch_disable(&susfs_is_log_enabled);
-		pr_info("susfs: disable logging to kernel");
 	}
 
 	info.err = 0;
@@ -1192,7 +1205,17 @@ out_copy_to_user:
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 
 /* susfs avc log spoofing */
-DEFINE_STATIC_KEY_FALSE(susfs_is_avc_log_spoofing_enabled);
+/*
+ * Enabled by default. The AVC log is the one place a root process
+ * cannot be hidden from: an untrusted_app that walks /proc and hits a
+ * u:r:ksu:s0 target gets "avc: denied ... tcontext=u:r:ksu:s0" written
+ * to the audit buffer, which any app can read back through logcat -b
+ * events. Rewriting the target context there is cheaper and far more
+ * robust than relying on every userspace module to call the ioctl at
+ * the right moment during boot, so make it the kernel default. The
+ * ioctl still exists to turn it off for debugging.
+ */
+DEFINE_STATIC_KEY_TRUE(susfs_is_avc_log_spoofing_enabled);
 
 void susfs_set_avc_log_spoofing(void __user **user_info) {
 	struct st_susfs_avc_log_spoofing info = {0};
