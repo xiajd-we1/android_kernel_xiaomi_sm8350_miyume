@@ -1,0 +1,14 @@
+config VENUS_FREQ
+    tristate "Venus Frequency QoS Control for Xiaomi Venus (SM8350)"
+    depends on CPU_FREQ
+    default m
+    help
+      Provides persistent per-cluster CPU frequency min/max control via
+      high-priority PM QoS requests. Designed to survive mi_thermald and
+      msm_performance overrides on Xiaomi Venus (SM8350) devices.
+      Exposes sysfs interface at /sys/kernel/venus_freq/policy{N}/
+
+      PM QoS frequency constraints live in kernel/power/qos.c, which is
+      linked unconditionally in this tree (obj-y), so CPU_FREQ is the only
+      hard dependency. freq_qos_add_request / update / remove are all
+      EXPORT_SYMBOL_GPL and therefore reachable from this module.
