@@ -338,7 +338,15 @@ static int venus_freq_probe_cluster(struct venus_cluster *cl,
 
     policy = cpufreq_cpu_get(first_cpu);
     if (!policy) {
-        pr_err("venus_freq: failed to get policy for cpu%d\n", first_cpu);
+        /*
+         * Prime cluster (cpu7) is routinely offline on Venus - the scheduler
+         * parks it to save power. A missing policy is therefore a normal
+         * runtime state, not a hard failure: skip this cluster and let the
+         * other two register. venusd can bring cpu7 online and reload the
+         * module if it wants Prime control back.
+         */
+        pr_info("venus_freq: cluster%d (cpu%d) offline, skipped\n",
+                cluster_id, first_cpu);
         return -ENODEV;
     }
     cl->policy = policy;
@@ -394,6 +402,8 @@ static const int venus_first_cpus[VENUS_MAX_CLUSTERS] = {0, 4, 7};
 static int __init venus_freq_init(void)
 {
     int i, ret;
+    int registered = 0;
+    int failed_offline = 0;
 
     pr_info("venus_freq: init v%s\n", VENUS_FREQ_VERSION);
 
@@ -403,15 +413,36 @@ static int __init venus_freq_init(void)
         return -ENOMEM;
     }
 
+    registered = 0;
     for (i = 0; i < VENUS_MAX_CLUSTERS; i++) {
         ret = venus_freq_probe_cluster(&g_clusters[i], i, venus_first_cpus[i]);
-        if (ret) {
-            pr_err("venus_freq: cluster%d probe failed (%d), rolling back\n", i, ret);
-            goto err_rollback;
+        if (!ret) {
+            registered++;
+            continue;
         }
+        /*
+         * -ENODEV means the CPU is offline so there is no policy to attach to.
+         * That is expected on Venus (cpu7 sleeps most of the time) and must not
+         * take the whole module down: keep the clusters that did register.
+         * Any other error is a real problem and still rolls everything back.
+         */
+        if (ret == -ENODEV) {
+            failed_offline++;
+            continue;
+        }
+        pr_err("venus_freq: cluster%d probe failed (%d), rolling back\n", i, ret);
+        goto err_rollback;
     }
 
-    pr_info("venus_freq: all %d clusters registered\n", VENUS_MAX_CLUSTERS);
+    if (registered == 0) {
+        pr_err("venus_freq: no cluster could be registered, aborting\n");
+        kobject_put(venus_kobj);
+        venus_kobj = NULL;
+        return -ENODEV;
+    }
+
+    pr_info("venus_freq: %d/%d clusters registered (%d offline)\n",
+            registered, VENUS_MAX_CLUSTERS, failed_offline);
     return 0;
 
 err_rollback:

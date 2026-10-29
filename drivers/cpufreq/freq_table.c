@@ -67,7 +67,7 @@ int cpufreq_frequency_table_verify(struct cpufreq_policy_data *policy,
 				   struct cpufreq_frequency_table *table)
 {
 	struct cpufreq_frequency_table *pos;
-	unsigned int freq, next_larger = ~0;
+	unsigned int freq, next_larger = ~0, next_smaller = 0;
 	bool found = false;
 
 	pr_debug("request for verification of policy (%u - %u kHz) for cpu %u\n",
@@ -85,10 +85,39 @@ int cpufreq_frequency_table_verify(struct cpufreq_policy_data *policy,
 
 		if ((next_larger > freq) && (freq > policy->max))
 			next_larger = freq;
+
+		/*
+		 * Venus patch: remember the fastest entry that still respects the
+		 * upper bound. When the QoS requests leave an empty [min, max] window
+		 * this is what we relax instead of the ceiling.
+		 */
+		if (freq <= policy->max && freq > next_smaller)
+			next_smaller = freq;
 	}
 
 	if (!found) {
-		policy->max = next_larger;
+		/*
+		 * Venus patch.
+		 *
+		 * freq_qos aggregates FREQ_QOS_MIN with max() and FREQ_QOS_MAX with
+		 * min(), so mi_thermald pushing its thermal target up and this module
+		 * pulling the ceiling down can produce min > max with no valid entry
+		 * in between. Stock code then assigns policy->max = next_larger,
+		 * silently raising the ceiling and defeating every cap the module
+		 * asks for - which is why rewriting scaling_max_freq from userspace
+		 * never held.
+		 *
+		 * Relax the floor instead whenever an entry <= max exists: violating
+		 * the lower bound only runs the CPU cooler, never hotter, and it keeps
+		 * the ceiling the caller actually requested. next_smaller == 0 means
+		 * max sits below the lowest table entry, which is a configuration
+		 * error rather than a QoS race; fall back to the stock behaviour so
+		 * the policy can still be established.
+		 */
+		if (next_smaller > 0)
+			policy->min = next_smaller;
+		else
+			policy->max = next_larger;
 		cpufreq_verify_within_cpu_limits(policy);
 	}
 
